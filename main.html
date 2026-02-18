@@ -1,0 +1,744 @@
+import { useMemo, useState } from "react";
+
+export default function CharacterCreator() {
+  const classes = [
+    "Scoundrel",
+    "Scout",
+    "Soldier",
+    "Specialist",
+    "Force User"
+  ];
+
+  const backgrounds = [
+    "Colonist",
+    "Frontier",
+    "Military",
+    "Corporate",
+    "Research"
+  ];
+
+  // Alphabetical species list
+  const speciesList = [
+    "Aqualish",
+    "Arkanian",
+    "Arkanian-Offshoot",
+    "Besalisk",
+    "Bith",
+    "Bothan",
+    "Cathar",
+    "Cerean",
+    "Chiss",
+    "Clawdite",
+    "Devaronian",
+    "Duros",
+    "Falleen",
+    "Gamorrean",
+    "Gand",
+    "Gotal",
+    "Human",
+    "Ithorian",
+    "Kel Dor",
+    "Miraluka",
+    "Nautolan",
+    "Ortolan",
+    "Quarren",
+    "Rodian",
+    "Shistavanen",
+    "Sluissi",
+    "Sullustan",
+    "Togruta",
+    "Trandoshan",
+    "Twi'lek",
+    "Weequay",
+    "Wookiee",
+    "Zabrak",
+    "Zeltron"
+  ];
+
+  const speciesInfo = Object.fromEntries(
+    speciesList.map((s) => [
+      s,
+      {
+        desc: "Species description placeholder.",
+        ability: "Placeholder Species Ability",
+        modifiers: "No stat modifiers defined yet."
+      }
+    ])
+  );
+
+  const classInfo = {
+    Scoundrel: {
+      hpPerLevel: 8,
+      primary: "Primary Ability: Higher of Dexterity or Charisma modifier.",
+      desc: "Tricksters and opportunists who thrive on flexibility.",
+      benefits: ["+2 skill proficiencies", "Bonus action mobility"]
+    },
+    Scout: {
+      hpPerLevel: 8,
+      primary: "Primary Ability: Higher of Dexterity or Wisdom modifier.",
+      desc: "Recon and survival experts built for exploration.",
+      benefits: ["Enhanced perception", "Terrain movement bonus"]
+    },
+    Soldier: {
+      hpPerLevel: 10,
+      primary: "Primary Ability: Higher of Strength or Dexterity modifier.",
+      desc: "Frontline combatant with heavy training.",
+      benefits: ["Weapon mastery", "Armor efficiency"]
+    },
+    Specialist: {
+      hpPerLevel: 6,
+      primary: "Primary Ability: Higher of Dexterity or Intelligence modifier.",
+      desc: "Technical expert with powerful tools.",
+      benefits: ["Advanced tech access", "Utility bonuses"]
+    },
+    "Force User": {
+      hpPerLevel: 8,
+      primary:
+        "Primary Ability: Highest of Strength, Dexterity, Wisdom, or Charisma modifier.",
+      desc: "Mystic adept wielding rare powers.",
+      benefits: ["Force abilities", "Energy techniques"]
+    }
+  };
+
+  const backgroundInfo = {
+    Colonist: {
+      desc: "Raised in an established off-world colony.",
+      benefits: ["Trade contacts", "Supply familiarity"]
+    },
+    Frontier: {
+      desc: "Survivor of harsh frontier worlds.",
+      benefits: ["Environmental resilience", "Navigation"]
+    },
+    Military: {
+      desc: "Formally trained in organized forces.",
+      benefits: ["Tactics", "Command protocols"]
+    },
+    Corporate: {
+      desc: "Product of megacorp structure.",
+      benefits: ["Negotiation", "Resource leverage"]
+    },
+    Research: {
+      desc: "Academic or field researcher.",
+      benefits: ["Analysis", "Knowledge base"]
+    }
+  };
+
+  const ATTRIBUTE_LIST = [
+    "Strength",
+    "Dexterity",
+    "Constitution",
+    "Intelligence",
+    "Wisdom",
+    "Charisma"
+  ];
+
+  const ATTRIBUTE_MIN = 8;
+  const ATTRIBUTE_MAX = 18;
+  const ATTRIBUTE_POINTS = 30;
+
+  const [charClass, setCharClass] = useState("Soldier");
+  const [background, setBackground] = useState("Colonist");
+  const [species, setSpecies] = useState("Human");
+  const [name, setName] = useState("");
+  const [level, setLevel] = useState(1);
+
+  const [currentHP, setCurrentHP] = useState(1);
+  const [tempHP, setTempHP] = useState(0);
+  const [currentVP, setCurrentVP] = useState(1);
+
+  const [currentStamina, setCurrentStamina] = useState(1);
+  const [currentPoise, setCurrentPoise] = useState(1);
+  const [currentResolve, setCurrentResolve] = useState(1);
+  const [currentForce, setCurrentForce] = useState(1);
+
+  const [attributes, setAttributes] = useState(() => {
+    const obj = {};
+    ATTRIBUTE_LIST.forEach((a) => (obj[a] = ATTRIBUTE_MIN));
+    return obj;
+  });
+
+  const [overlay, setOverlay] = useState(null);
+  const [pendingChoice, setPendingChoice] = useState(null);
+
+  const modifiers = useMemo(() => {
+    const m = {};
+    for (const k of ATTRIBUTE_LIST) {
+      m[k] = Math.floor((attributes[k] - 10) / 2);
+    }
+    return m;
+  }, [attributes]);
+
+  const conMod = modifiers.Constitution;
+  const dexMod = modifiers.Dexterity;
+  const strMod = modifiers.Strength;
+  const intMod = modifiers.Intelligence;
+  const wisMod = modifiers.Wisdom;
+  const chaMod = modifiers.Charisma;
+
+  const hpPerLevel = useMemo(() => {
+    return classInfo[charClass].hpPerLevel + conMod;
+  }, [charClass, conMod]);
+
+  const maxHP = useMemo(
+    () => Math.max(level * hpPerLevel, level),
+    [level, hpPerLevel]
+  );
+  const maxVP = useMemo(
+    () => Math.max(level + conMod, 1),
+    [level, conMod]
+  );
+
+  const maxStamina = useMemo(() => Math.max(5 + dexMod + conMod, 7), [
+    dexMod,
+    conMod
+  ]);
+
+  const maxPoise = useMemo(
+    () => attributes.Constitution + level,
+    [attributes.Constitution, level]
+  );
+
+  const primaryAbilityMod = useMemo(() => {
+    if (charClass === "Soldier") return Math.max(strMod, dexMod);
+    if (charClass === "Scoundrel") return Math.max(dexMod, chaMod);
+    if (charClass === "Scout") return Math.max(dexMod, wisMod);
+    if (charClass === "Specialist") return Math.max(dexMod, intMod);
+    if (charClass === "Force User")
+      return Math.max(strMod, dexMod, wisMod, chaMod);
+    return 0;
+  }, [charClass, strMod, dexMod, wisMod, chaMod, intMod]);
+
+  const maxResolve = useMemo(
+    () => Math.max(primaryAbilityMod, 1),
+    [primaryAbilityMod]
+  );
+
+  const maxForce = useMemo(
+    () =>
+      Math.floor(
+        (attributes.Intelligence + attributes.Wisdom + attributes.Charisma) /
+          2
+      ),
+    [attributes.Intelligence, attributes.Wisdom, attributes.Charisma]
+  );
+
+  const spentPoints = useMemo(() => {
+    return ATTRIBUTE_LIST.reduce(
+      (sum, k) => sum + (attributes[k] - ATTRIBUTE_MIN),
+      0
+    );
+  }, [attributes]);
+
+  const remainingPoints = ATTRIBUTE_POINTS - spentPoints;
+
+  function handleLevelChange(e) {
+    let value = Number(e.target.value);
+    if (isNaN(value)) value = 1;
+    if (value < 1) value = 1;
+    if (value > 100) value = 100;
+    setLevel(value);
+  }
+
+  function clampPools() {
+    setCurrentHP((v) => Math.min(Math.max(0, v), maxHP));
+    setCurrentVP((v) => Math.min(Math.max(0, v), maxVP));
+    setCurrentStamina((v) => Math.min(Math.max(0, v), maxStamina));
+    setCurrentPoise((v) => Math.min(Math.max(0, v), maxPoise));
+    setCurrentResolve((v) => Math.min(Math.max(0, v), maxResolve));
+    setCurrentForce((v) => Math.min(Math.max(0, v), maxForce));
+  }
+
+  function openOverlay(type) {
+    setOverlay(type);
+    if (type === "class") setPendingChoice(charClass);
+    if (type === "background") setPendingChoice(background);
+    if (type === "species") setPendingChoice(species);
+  }
+
+  function acceptOverlay() {
+    if (overlay === "class" && pendingChoice) setCharClass(pendingChoice);
+    if (overlay === "background" && pendingChoice)
+      setBackground(pendingChoice);
+    if (overlay === "species" && pendingChoice) setSpecies(pendingChoice);
+    setOverlay(null);
+  }
+
+  function exportCharacter() {
+    const data = {
+      name,
+      level,
+      class: charClass,
+      background,
+      species,
+      attributes,
+      modifiers,
+      hp: { max: maxHP, current: currentHP, temp: tempHP },
+      vp: { max: maxVP, current: currentVP },
+      stamina: { max: maxStamina, current: currentStamina },
+      poise: { max: maxPoise, current: currentPoise },
+      resolve: { max: maxResolve, current: currentResolve },
+      force: { max: maxForce, current: currentForce }
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name || "character"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function changeAttr(attr, delta) {
+    setAttributes((prev) => {
+      const next = { ...prev };
+      const newVal = next[attr] + delta;
+      if (newVal < ATTRIBUTE_MIN || newVal > ATTRIBUTE_MAX) return prev;
+      const newSpent = spentPoints + delta;
+      if (delta > 0 && newSpent > ATTRIBUTE_POINTS) return prev;
+      next[attr] = newVal;
+      return next;
+    });
+  }
+
+  useMemo(clampPools, [
+    maxHP,
+    maxVP,
+    maxStamina,
+    maxPoise,
+    maxResolve,
+    maxForce
+  ]);
+
+  const abilities = useMemo(() => {
+    const list = [];
+    list.push(`${species}: ${speciesInfo[species].ability}`);
+    list.push(`${charClass}: Core class features (placeholder)`);
+    list.push(`${background}: Background feature (placeholder)`);
+    return list;
+  }, [species, charClass, background]);
+
+  return (
+    <div className="min-h-screen w-full bg-slate-950 text-slate-100">
+      <div className="grid grid-cols-4 min-h-screen">
+        {/* LEFT */}
+        <div className="col-span-1 border-r border-slate-800 bg-slate-900 p-6 space-y-4">
+          <h2 className="text-xl font-semibold">Character Options</h2>
+
+          <button
+            onClick={() => openOverlay("class")}
+            className="w-full rounded-2xl bg-slate-800 border border-slate-700 p-4 text-left hover:bg-slate-700"
+          >
+            <div className="text-sm text-slate-400">Class</div>
+            <div className="text-xl font-semibold text-right">
+              {charClass}
+            </div>
+          </button>
+
+          <button
+            onClick={() => openOverlay("background")}
+            className="w-full rounded-2xl bg-slate-800 border border-slate-700 p-4 text-left hover:bg-slate-700"
+          >
+            <div className="text-sm text-slate-400">Background</div>
+            <div className="text-xl font-semibold text-right">
+              {background}
+            </div>
+          </button>
+
+          <button
+            onClick={() => openOverlay("species")}
+            className="w-full rounded-2xl bg-slate-800 border border-slate-700 p-4 text-left hover:bg-slate-700"
+          >
+            <div className="text-sm text-slate-400">Species</div>
+            <div className="text-xl font-semibold text-right">
+              {species}
+            </div>
+          </button>
+
+          <button
+            onClick={() => openOverlay("attributes")}
+            className="w-full rounded-2xl bg-slate-800 border border-slate-700 p-4 text-left hover:bg-slate-700 relative"
+          >
+            <div className="text-sm text-slate-400">Starting Attributes</div>
+            <div className="text-xl font-semibold text-right">
+              {remainingPoints} pts
+            </div>
+            {remainingPoints > 0 && (
+              <div className="absolute top-3 right-3 text-red-400 font-bold">
+                !
+              </div>
+            )}
+          </button>
+
+          <button
+            onClick={exportCharacter}
+            className="w-full rounded-2xl bg-slate-700 hover:bg-slate-600 p-3 font-medium"
+          >
+            Export Character
+          </button>
+        </div>
+
+        {/* RIGHT */}
+        <div className="col-span-3 p-8 space-y-8">
+          <h1 className="text-3xl font-bold">Character Sheet</h1>
+
+          <div className="grid grid-cols-3 gap-8 max-w-6xl">
+            {/* Main */}
+            <div className="col-span-2 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-sm text-slate-400">Name</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-400">Level</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={level}
+                    onChange={handleLevelChange}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3"
+                  />
+                </div>
+              </div>
+
+              {/* RESOURCE GRID */}
+              <div className="grid grid-cols-2 gap-4">
+                <StatBox
+                  title="Hit Points"
+                  max={maxHP}
+                  current={currentHP}
+                  setCurrent={setCurrentHP}
+                />
+
+                <StatBox
+                  title="Vitality Points"
+                  max={maxVP}
+                  current={currentVP}
+                  setCurrent={setCurrentVP}
+                />
+
+                <TempBox
+                  title="Temp HP"
+                  value={tempHP}
+                  setValue={setTempHP}
+                />
+
+                <StatBox
+                  title="Stamina"
+                  max={maxStamina}
+                  current={currentStamina}
+                  setCurrent={setCurrentStamina}
+                />
+
+                <StatBox
+                  title="Poise"
+                  max={maxPoise}
+                  current={currentPoise}
+                  setCurrent={setCurrentPoise}
+                />
+
+                <StatBox
+                  title="Resolve"
+                  max={maxResolve}
+                  current={currentResolve}
+                  setCurrent={setCurrentResolve}
+                />
+
+                <StatBox
+                  title="Force"
+                  max={maxForce}
+                  current={currentForce}
+                  setCurrent={setCurrentForce}
+                />
+              </div>
+
+              {/* Abilities */}
+              <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
+                <div className="text-sm text-slate-400">Abilities</div>
+                <div className="h-px bg-slate-700/60" />
+                <div className="space-y-2">
+                  {abilities.map((a) => (
+                    <div
+                      key={a}
+                      className="text-slate-300 bg-slate-800/60 border border-slate-700 rounded-lg p-2"
+                    >
+                      {a}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Attribute column */}
+            <div className="space-y-3">
+              {ATTRIBUTE_LIST.map((attr) => (
+                <div
+                  key={attr}
+                  className="rounded-xl bg-slate-900 border border-slate-800 p-3 flex justify-between items-center"
+                >
+                  <div>
+                    <div className="text-xs text-slate-400">{attr}</div>
+                    <div className="text-lg font-semibold">
+                      {attributes[attr]}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500">Mod</div>
+                    <div className="text-lg font-semibold">
+                      {modifiers[attr] >= 0 ? "+" : ""}
+                      {modifiers[attr]}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* OVERLAY (unchanged) */}
+      {overlay && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm">
+          <div className="grid grid-cols-4 h-full">
+            <div className="col-span-1 bg-slate-900 border-r border-slate-800 p-6 space-y-2 overflow-y-auto">
+              {overlay === "class" &&
+                classes.map((c) => (
+                  <div
+                    key={c}
+                    onClick={() => setPendingChoice(c)}
+                    onDoubleClick={() => {
+                      setCharClass(c);
+                      setOverlay(null);
+                    }}
+                    className={`p-3 rounded-xl cursor-pointer border ${
+                      pendingChoice === c
+                        ? "bg-slate-700 border-slate-500"
+                        : "bg-slate-800 border-slate-700"
+                    }`}
+                  >
+                    {c}
+                  </div>
+                ))}
+
+              {overlay === "background" &&
+                backgrounds.map((b) => (
+                  <div
+                    key={b}
+                    onClick={() => setPendingChoice(b)}
+                    onDoubleClick={() => {
+                      setBackground(b);
+                      setOverlay(null);
+                    }}
+                    className={`p-3 rounded-xl cursor-pointer border ${
+                      pendingChoice === b
+                        ? "bg-slate-700 border-slate-500"
+                        : "bg-slate-800 border-slate-700"
+                    }`}
+                  >
+                    {b}
+                  </div>
+                ))}
+
+              {overlay === "species" &&
+                speciesList.map((s) => (
+                  <div
+                    key={s}
+                    onClick={() => setPendingChoice(s)}
+                    onDoubleClick={() => {
+                      setSpecies(s);
+                      setOverlay(null);
+                    }}
+                    className={`p-3 rounded-xl cursor-pointer border ${
+                      pendingChoice === s
+                        ? "bg-slate-700 border-slate-500"
+                        : "bg-slate-800 border-slate-700"
+                    }`}
+                  >
+                    {s}
+                  </div>
+                ))}
+
+              {overlay === "attributes" && (
+                <div className="space-y-3">
+                  <div className="text-sm text-slate-400">
+                    Use controls on the right to assign points.
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Remaining Points: {remainingPoints}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="col-span-3 bg-slate-950 p-8 relative overflow-y-auto">
+              <button
+                onClick={() => setOverlay(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+
+              {overlay === "class" && pendingChoice && (
+                <OverlayDetail
+                  title={pendingChoice}
+                  desc={classInfo[pendingChoice].desc}
+                  primary={classInfo[pendingChoice].primary}
+                  benefits={classInfo[pendingChoice].benefits}
+                  onAccept={acceptOverlay}
+                />
+              )}
+
+              {overlay === "background" && pendingChoice && (
+                <OverlayDetail
+                  title={pendingChoice}
+                  desc={backgroundInfo[pendingChoice].desc}
+                  benefits={backgroundInfo[pendingChoice].benefits}
+                  onAccept={acceptOverlay}
+                />
+              )}
+
+              {overlay === "species" && pendingChoice && (
+                <OverlayDetail
+                  title={pendingChoice}
+                  desc={speciesInfo[pendingChoice].desc}
+                  benefits={[
+                    speciesInfo[pendingChoice].modifiers,
+                    speciesInfo[pendingChoice].ability
+                  ]}
+                  onAccept={acceptOverlay}
+                />
+              )}
+
+              {overlay === "attributes" && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-semibold">
+                      Starting Attributes
+                    </h2>
+                    <div className="text-sm text-slate-400">
+                      Spend {ATTRIBUTE_POINTS} points. Scores range {ATTRIBUTE_MIN}–{ATTRIBUTE_MAX}.
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      Remaining Points: {remainingPoints}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 max-w-xl">
+                    {ATTRIBUTE_LIST.map((attr) => (
+                      <div
+                        key={attr}
+                        className="rounded-xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="text-sm text-slate-300">{attr}</div>
+                          <div className="text-xs text-slate-500">
+                            Mod {modifiers[attr] >= 0 ? "+" : ""}
+                            {modifiers[attr]}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => changeAttr(attr, -1)}
+                            className="px-3 py-1 rounded-md bg-slate-700 hover:bg-slate-600"
+                          >
+                            −
+                          </button>
+                          <div className="w-12 text-center font-semibold">
+                            {attributes[attr]}
+                          </div>
+                          <button
+                            onClick={() => changeAttr(attr, 1)}
+                            className="px-3 py-1 rounded-md bg-slate-700 hover:bg-slate-600"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      onClick={() => setOverlay(null)}
+                      className="px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatBox({ title, max, current, setCurrent }) {
+  return (
+    <div className="rounded-xl bg-slate-900 border border-slate-800 p-3 space-y-2">
+      <div className="flex justify-between text-xs text-slate-400">
+        <span>{title}</span>
+        <span>Max {max}</span>
+      </div>
+      <input
+        type="number"
+        value={current}
+        onChange={(e) => setCurrent(Math.max(0, Number(e.target.value)))}
+        className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-sm"
+      />
+    </div>
+  );
+}
+
+function OverlayDetail({ title, desc, primary, benefits = [], onAccept }) {
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <h2 className="text-2xl font-semibold">{title}</h2>
+      {primary && (
+        <div className="text-sm text-indigo-400">{primary}</div>
+      )}
+      <p className="text-slate-300">{desc}</p>
+      <div className="space-y-2">
+        {benefits.map((b) => (
+          <div
+            key={b}
+            className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-sm text-slate-300"
+          >
+            {b}
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={onAccept}
+        className="mt-4 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500"
+      >
+        Accept
+      </button>
+    </div>
+  );
+}
+
+function TempBox({ title, value, setValue }) {
+  return (
+    <div className="rounded-xl bg-slate-900 border border-slate-800 p-3 space-y-2">
+      <div className="text-xs text-slate-400">{title}</div>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => setValue(Number(e.target.value) || 0)}
+        className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-sm"
+      />
+    </div>
+  );
+}
